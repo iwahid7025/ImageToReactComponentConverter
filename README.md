@@ -1,2 +1,4 @@
 # ImageToReactComponentConverter
-Converts image to a React component code
+
+- Front End (React)
+- Back End (MCP Server)
