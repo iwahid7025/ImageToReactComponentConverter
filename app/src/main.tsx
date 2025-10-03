@@ -9,6 +9,7 @@ import App from "./App";
 import "./index.css";
 
 // Create React root and render the app in strict mode for highlighting potential issues
+// The root element is guaranteed to exist in index.html
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
