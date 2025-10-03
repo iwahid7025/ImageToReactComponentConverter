@@ -1,14 +1,30 @@
 import Editor from "@monaco-editor/react";
 
+/**
+ * Props for the CodePane component
+ */
 type Props = {
+  /** The TypeScript/TSX code to display in the editor */
   code: string;
+
+  /** Optional callback invoked when the code changes */
   onChange?: (value: string) => void;
 };
 
 /**
- * Monaco editor for TS/TSX.
- * - Editable so you can tweak the AI output.
- * - We keep word wrap and a small feature set to stay beginner-friendly.
+ * CodePane Component
+ *
+ * A Monaco-based code editor configured for TypeScript/TSX editing.
+ * Features:
+ * - Syntax highlighting for TypeScript/TSX
+ * - Word wrapping for better readability
+ * - Auto-layout for responsive sizing
+ * - Editable by default to allow tweaking AI-generated code
+ * - Minimal UI (no minimap) to stay beginner-friendly
+ *
+ * @param props - Component props
+ * @param props.code - The code content to display
+ * @param props.onChange - Callback fired when user edits the code
  */
 export default function CodePane({ code, onChange }: Props) {
   return (
