@@ -1,44 +1,23 @@
-/**
- * Code Editor Component
- *
- * Displays AI-generated React/TypeScript code in a Monaco editor.
- * Currently configured as read-only for viewing generated code.
- *
- * Features:
- * - Syntax highlighting for TypeScript/TSX
- * - Code folding and formatting
- * - Word wrapping for better readability
- *
- * @component
- * @param {Props} props - Component props
- * @param {string} props.code - The TypeScript/TSX code to display
- * @param {function} props.onChange - Optional callback when code is edited
- *
- * @remarks Currently supports manual editing. Error highlighting and type checking planned for future iterations
- */
-
 import Editor from "@monaco-editor/react";
 
 type Props = {
-  /** The code string to display in the editor */
   code: string;
-  /** Optional callback when code changes */
-  onChange?: (value: string | undefined) => void;
+  onChange?: (value: string) => void;
 };
 
 /**
- * Controlled Monaco editor:
- * - Use `value={code}` (NOT defaultValue) so updates from parent state appear.
- * - Keep it read-only for now.
+ * Monaco editor for TS/TSX.
+ * - Editable so you can tweak the AI output.
+ * - We keep word wrap and a small feature set to stay beginner-friendly.
  */
 export default function CodePane({ code, onChange }: Props) {
   return (
-    <div style={{ flex: 1, minHeight: 0, height: "100%" }}>
+    <div style={{ flex: 1, minHeight: 0 }}>
       <Editor
         height="100%"
-        language="typescript"
-        value={code}                 // <-- controlled
-        onChange={onChange}          // <-- sync changes back to parent
+        defaultLanguage="typescript"
+        value={code}
+        onChange={(val) => onChange?.(val ?? "")}
         options={{
           readOnly: false,
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -46,6 +25,7 @@ export default function CodePane({ code, onChange }: Props) {
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
           wordWrap: "on",
+          automaticLayout: true,
         }}
       />
     </div>

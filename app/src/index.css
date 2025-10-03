@@ -58,9 +58,8 @@ body {
 }
 
 .right-col {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .pane {

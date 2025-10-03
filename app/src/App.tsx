@@ -1,19 +1,26 @@
 import { useState } from "react";
 import UploadImage from "./components/UploadImage";
 import CodePane from "./components/CodePane";
-import PreviewPane from "./components/PreviewPane";
 import "./index.css";
 
 /**
- * Step 5:
- * - Converts the selected image to base64 in the browser (no secrets involved).
- * - Sends base64 to the MCP server's REST façade endpoint (/api/image-to-react).
- * - Shows returned TSX in Monaco (still read-only).
+ * Step 6:
+ * - Monaco is now editable.
+ * - The Preview pane renders whatever TSX is in the editor using a sandboxed iframe.
+ * - The Generate button still calls your MCP server to produce initial TSX from an image.
  */
 export default function App() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [generatedCode, setGeneratedCode] = useState<string>(
-    `// AI-generated React (TSX) component will appear here after you click "Generate from Image".`
+    `/** 
+ * This area will show AI-generated React TSX.
+ * Try pasting a simple component, e.g.:
+ *
+ * export default function Hello() {
+ *   return <div style={{padding:16}}>Hello, Preview!</div>;
+ * }
+ */
+`
   );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -37,19 +44,16 @@ export default function App() {
     try {
       setIsLoading(true);
 
-      // 1) Convert to base64 data URL in the browser
       const dataUrl = await toBase64DataUrl(imageFile);
 
-      // 2) POST to the MCP server (server holds the OpenAI key)
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5287";
       const res = await fetch(`${apiUrl}/api/image-to-react`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: dataUrl,
-          // optional hints; leave empty for now or wire a small input box
-          hints: "produce a clean, semantic layout"
-        })
+          hints: "produce a clean, semantic layout",
+        }),
       });
 
       if (!res.ok) {
@@ -58,10 +62,7 @@ export default function App() {
       }
 
       const json = await res.json();
-      if (!json?.tsx) {
-        throw new Error("No TSX in server response.");
-      }
-
+      if (!json?.tsx) throw new Error("No TSX in server response.");
       setGeneratedCode(json.tsx);
     } catch (err: any) {
       setErrorMsg(err?.message ?? String(err));
@@ -97,17 +98,11 @@ export default function App() {
         )}
       </aside>
 
-      {/* Right column: code + preview */}
+      {/* Right column: code only */}
       <main className="right-col">
-        <section className="pane">
+        <section className="pane" style={{ flex: 1 }}>
           <h2>2) Generated Code</h2>
-          <CodePane code={generatedCode} />
-        </section>
-
-        <section className="pane">
-          <h2>3) Preview</h2>
-          <PreviewPane />
-          {/* NOTE: We don't render the generated TSX yet — Step 6 will safely evaluate and preview it. */}
+          <CodePane code={generatedCode} onChange={setGeneratedCode} />
         </section>
       </main>
     </div>
