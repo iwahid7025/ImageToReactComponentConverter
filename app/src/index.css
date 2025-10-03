@@ -55,11 +55,30 @@ body {
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
+  text-align: center;
+}
+
+/* Secondary button style */
+.secondary-btn {
+  display: inline-block;
+  background: #374151;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  text-align: center;
 }
 
 .right-col {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: 16px;
+}
+
+/* New helper when there is just one pane on the right */
+.right-col.one-pane {
+  grid-template-rows: 1fr;
 }
 
 .pane {

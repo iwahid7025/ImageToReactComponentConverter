@@ -68,6 +68,12 @@ app.MapPost("/api/image-to-react", async (ImageToReactTool.Input input, IHttpCli
     return Results.Json(new { tsx });
 });
 
+app.MapPost("/api/refine-code", async (RefineCodeTool.Input input, IHttpClientFactory httpFactory) =>
+{
+    var refinedCode = await RefineCodeTool.RefineCode(input, httpFactory);
+    return Results.Json(new { refinedCode });
+});
+
 app.Run();
 
 
@@ -195,4 +201,94 @@ export default function GeneratedError() {{
     // Minimal escape for JSX <pre>
     private static string EscapeForJsx(string s) =>
         s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+}
+
+// ================== REFINE CODE TOOL ==================
+[McpServerToolType]
+public static class RefineCodeTool
+{
+    public class Input
+    {
+        public required string Code { get; set; }
+    }
+
+    /// <summary>
+    /// Takes existing TSX code and refines it by:
+    /// - Fixing any syntax errors or issues
+    /// - Properly formatting the code
+    /// - Adding comprehensive JSDoc comments
+    /// - Improving code structure and readability
+    /// </summary>
+    [McpServerTool, Description("Refine and improve existing React TSX code with fixes, formatting, and comments.")]
+    public static async ValueTask<string> RefineCode(Input input, IHttpClientFactory httpFactory)
+    {
+        var systemPrompt =
+@"You are an expert React + TypeScript code refactoring assistant.
+Given existing TSX code, you must:
+1. Fix any syntax errors, bugs, or type issues
+2. Format the code properly with consistent indentation and spacing
+3. Add comprehensive JSDoc comments explaining the component, props, and complex logic
+4. Improve code structure, naming, and readability
+5. Ensure the code follows React and TypeScript best practices
+
+IMPORTANT RULES:
+- Preserve the original functionality - do not change what the component does
+- Return ONLY a Markdown fenced code block with language 'tsx' (no extra commentary)
+- The code should be production-ready and well-documented";
+
+        var userPrompt = $@"Please refine, fix, format, and add proper comments to this React TSX code:
+
+{input.Code}";
+
+        var http = httpFactory.CreateClient("openai");
+
+        var payload = new
+        {
+            model = "gpt-4o-mini",
+            messages = new object[]
+            {
+                new {
+                    role = "system",
+                    content = systemPrompt
+                },
+                new {
+                    role = "user",
+                    content = userPrompt
+                }
+            },
+            temperature = 0.3,
+            max_tokens = 2000
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        using var res = await http.SendAsync(req);
+        var body = await res.Content.ReadAsStringAsync();
+
+        if (!res.IsSuccessStatusCode)
+        {
+            var errorMsg = $"OpenAI API error {(int)res.StatusCode}: {body}";
+            return $"// Error refining code: {errorMsg}\n\n{input.Code}";
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var content = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        if (string.IsNullOrWhiteSpace(content))
+            return input.Code;
+
+        // Extract ```tsx ... ``` fenced block if present
+        var match = Regex.Match(content, "```tsx\\s*([\\s\\S]*?)```", RegexOptions.Multiline);
+        var refinedTsx = match.Success ? match.Groups[1].Value.Trim() : content.Trim();
+
+        return refinedTsx;
+    }
 }
