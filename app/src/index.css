@@ -1,0 +1,103 @@
+/* Keep styles minimal and readable. No frameworks yet. */
+:root {
+  --bg: #0f172a; /* slate-950-ish */
+  --panel: #111827; /* gray-900-ish */
+  --text: #e5e7eb; /* gray-200-ish */
+  --muted: #94a3b8; /* slate-400-ish */
+  --border: #1f2937; /* gray-800-ish */
+  --accent: #2563eb; /* blue-600-ish */
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  height: 100%;
+  padding: 16px;
+}
+
+.left-col,
+.right-col {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.left-col h2,
+.right-col h2 {
+  margin: 0 0 8px;
+}
+.muted {
+  color: var(--muted);
+  margin: 6px 0 12px;
+}
+
+.upload .upload-btn {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.right-col {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 16px;
+}
+
+.pane {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 0; /* allow children to flex correctly */
+  display: flex;
+  flex-direction: column;
+}
+
+.code-pane {
+  flex: 1;
+  width: 100%;
+  min-height: 160px;
+  resize: none;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0b1220;
+  color: var(--text);
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.4;
+}
+
+.preview-pane {
+  flex: 1;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0b1220;
+  display: grid;
+  place-items: center;
+}
+
+.preview-placeholder {
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 8px;
+}
