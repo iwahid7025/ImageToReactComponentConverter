@@ -12,8 +12,9 @@
  * @component
  * @param {Props} props - Component props
  * @param {string} props.code - The TypeScript/TSX code to display
+ * @param {function} props.onChange - Optional callback when code is edited
  *
- * @future Will support live editing with error highlighting and type checking
+ * @remarks Currently supports manual editing. Error highlighting and type checking planned for future iterations
  */
 
 import Editor from "@monaco-editor/react";
@@ -21,22 +22,30 @@ import Editor from "@monaco-editor/react";
 type Props = {
   /** The code string to display in the editor */
   code: string;
+  /** Optional callback when code changes */
+  onChange?: (value: string | undefined) => void;
 };
 
-export default function CodePane({ code }: Props) {
+/**
+ * Controlled Monaco editor:
+ * - Use `value={code}` (NOT defaultValue) so updates from parent state appear.
+ * - Keep it read-only for now.
+ */
+export default function CodePane({ code, onChange }: Props) {
   return (
-    <div style={{ flex: 1, minHeight: 0 }}>
+    <div style={{ flex: 1, minHeight: 0, height: "100%" }}>
       <Editor
         height="100%"
-        defaultLanguage="typescript"
-        defaultValue={code}
+        language="typescript"
+        value={code}                 // <-- controlled
+        onChange={onChange}          // <-- sync changes back to parent
         options={{
-          readOnly: true,
+          readOnly: false,
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
           fontSize: 13,
-          minimap: { enabled: false }, // Disable minimap for cleaner UI
+          minimap: { enabled: false },
           scrollBeyondLastLine: false,
-          wordWrap: "on", // Enable word wrapping for long lines
+          wordWrap: "on",
         }}
       />
     </div>
