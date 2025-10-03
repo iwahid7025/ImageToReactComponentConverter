@@ -5,99 +5,109 @@ import PreviewPane from "./components/PreviewPane";
 import "./index.css";
 
 /**
- * App is the top-level React component.
- * - Left: image upload + "Test MCP Tool" button (hits /api/image-to-react)
- * - Right: "Generated Code" (Monaco editor, read-only for now)
- * - Right: "Preview" (renders a static sample component for now)
- *
- * Next steps:
- *  - Step 5: wire OpenAI Vision in the server and send real images
- *  - Step 6: render returned TSX dynamically and show errors nicely
+ * Step 5:
+ * - Converts the selected image to base64 in the browser (no secrets involved).
+ * - Sends base64 to the MCP server's REST façade endpoint (/api/image-to-react).
+ * - Shows returned TSX in Monaco (still read-only).
  */
 export default function App() {
-  // Keep track of the selected image file (not uploaded yet in Step 3/4).
   const [imageFile, setImageFile] = useState<File | null>(null);
-
-  // Placeholder text; if server returns TSX, we overwrite this.
   const [generatedCode, setGeneratedCode] = useState<string>(
-    `// AI-generated React (TSX) component will appear here after calling the server.\n` +
-      `// For now, click "Test MCP Tool" to fetch a placeholder component from your C# server.\n\n` +
-      `// Example output format expected from the server:\n` +
-      `// export default function MyComponent() {\n` +
-      `//   return <div>Hello from AI!</div>;\n` +
-      `// }`
+    `// AI-generated React (TSX) component will appear here after you click "Generate from Image".`
   );
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  /**
-   * Tests the MCP server connection by calling the image-to-react endpoint.
-   * Currently sends placeholder data; will be updated to send real base64 images in Step 5.
-   * Updates the generatedCode state with the server response or error message.
-   *
-   * @remarks The URL/port should match your server configuration (currently localhost:5287)
-   */
-  async function testCall() {
+  const toBase64DataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result)); // data:*/*;base64,....
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleGenerate = async () => {
+    setErrorMsg(null);
+
+    if (!imageFile) {
+      setErrorMsg("Please choose an image first.");
+      return;
+    }
+
     try {
-      const res = await fetch("http://localhost:5287/api/image-to-react", {
+      setIsLoading(true);
+
+      // 1) Convert to base64 data URL in the browser
+      const dataUrl = await toBase64DataUrl(imageFile);
+
+      // 2) POST to the MCP server (server holds the OpenAI key)
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5287";
+      const res = await fetch(`${apiUrl}/api/image-to-react`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Step 4 ignores the actual image; we’ll send the real base64 in Step 5.
         body: JSON.stringify({
-          imageBase64: "data:image/png;base64,AAAA",
-          hints: "simple card",
-        }),
+          imageBase64: dataUrl,
+          // optional hints; leave empty for now or wire a small input box
+          hints: "produce a clean, semantic layout"
+        })
       });
+
       if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+        const text = await res.text();
+        throw new Error(`Server error ${res.status}: ${text}`);
       }
-      const json = (await res.json()) as { tsx?: string };
-      if (json?.tsx) setGeneratedCode(json.tsx);
-    } catch (err) {
-      console.error("Server test error:", err);
-      setGeneratedCode(
-        `// Error calling server. Check the console and that the server is running.\n// ${String(err)}`
-      );
+
+      const json = await res.json();
+      if (!json?.tsx) {
+        throw new Error("No TSX in server response.");
+      }
+
+      setGeneratedCode(json.tsx);
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? String(err));
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="app-shell">
-      {/* Left: Upload & actions */}
+      {/* Left column: image upload */}
       <aside className="left-col">
         <h2>1) Upload UI Image</h2>
         <p className="muted">
-          Select a PNG or JPG screenshot/sketch. In the next steps we’ll send it
-          to the MCP server for conversion.
+          Select a PNG or JPG screenshot/sketch. Then click <em>Generate from Image</em>.
         </p>
 
         <UploadImage onFileSelected={setImageFile} />
-
         {imageFile && (
-          <p className="muted" style={{ marginTop: 8 }}>
+          <p className="muted">
             Selected: <strong>{imageFile.name}</strong>
           </p>
         )}
 
-        <div style={{ marginTop: 12 }}>
-          <button className="upload-btn" onClick={testCall}>
-            Test MCP Tool
-          </button>
-          <p className="muted" style={{ marginTop: 8 }}>
-            This calls <code>/api/image-to-react</code> on your C# server and
-            shows the returned TSX in the editor.
+        <button className="upload-btn" onClick={handleGenerate} disabled={isLoading}>
+          {isLoading ? "Generating…" : "Generate from Image"}
+        </button>
+
+        {errorMsg && (
+          <p className="muted" style={{ color: "#fca5a5", marginTop: 8 }}>
+            {errorMsg}
           </p>
-        </div>
+        )}
       </aside>
 
-      {/* Right: Code + Preview */}
+      {/* Right column: code + preview */}
       <main className="right-col">
         <section className="pane">
           <h2>2) Generated Code</h2>
-          <CodePane code={generatedCode} onChange={(value) => setGeneratedCode(value || "")} />
+          <CodePane code={generatedCode} />
         </section>
 
         <section className="pane">
           <h2>3) Preview</h2>
           <PreviewPane />
+          {/* NOTE: We don't render the generated TSX yet — Step 6 will safely evaluate and preview it. */}
         </section>
       </main>
     </div>

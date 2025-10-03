@@ -4,109 +4,194 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Log to console (useful while testing with MCP clients)
+// Load environment variables from .env (server-side only)
+DotNetEnv.Env.Load(); // looks for .env in current working dir
+var openAiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+if (string.IsNullOrWhiteSpace(openAiApiKey))
+{
+    throw new InvalidOperationException("OPENAI_API_KEY is not set. Create server/.env and add OPENAI_API_KEY=...");
+}
+
+// Read server port from .env or default to 5287
+var serverPort = Environment.GetEnvironmentVariable("SERVER_PORT") ?? "5287";
+builder.WebHost.UseUrls($"http://localhost:{serverPort}");
+
+// Console logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
-// 1) Register MCP server + (preview) HTTP/SSE transport + scan for tools in this assembly
+// Register MCP server and auto-discover tool methods in this assembly
 builder.Services
     .AddMcpServer()
-    // NOTE: The exact extension name may differ as the SDK evolves (preview).
-    // In current previews, the AspNetCore package wires HTTP/SSE endpoints and DI.
-    // We'll map routes below via middleware.
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly(); // finds [McpServerToolType] types with [McpServerTool] methods
 
-// 2) Allow your Vite app to call this server during local dev
+// Allow calls from your Vite dev server
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()
-    );
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials());
+});
+
+// Basic HttpClient for OpenAI calls
+builder.Services.AddHttpClient("openai", client =>
+{
+    client.BaseAddress = new Uri("https://api.openai.com/v1/");
+    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", openAiApiKey);
 });
 
 var app = builder.Build();
 app.UseCors();
 
-// 3) Map MCP endpoints (HTTP + SSE) for browser clients
-//    Streamable HTTP is the MCP standard for web environments.
-//    The SDK’s AspNetCore package provides helpers to map the MCP routes.
-//    Depending on preview version, you’ll see helpers such as:
-//      app.MapMcpSse("/mcp/sse");   // Server-Sent Events stream
-//      app.MapMcpHttp("/mcp");      // POST endpoint for JSON-RPC requests
-//
-// If your current preview exposes a different naming (e.g., MapMcpEndpoints),
-// prefer that; the concept is the same: one POST route + one SSE route.
 app.MapGet("/", () => "ImageToReact MCP server is running");
 
-// ---- MCP tool test façade (optional convenience) ----
-// This is a simple REST endpoint that calls the same code as our tool method.
-// It lets your React app fetch() without speaking MCP yet; we keep both paths
-// so you can graduate to pure MCP later without changing business logic.
-// REST façade endpoint for testing - allows React app to call the tool without MCP protocol.
-// In production, clients should use the MCP endpoints for full protocol support.
-app.MapPost("/api/image-to-react", async (ImageToReactTool.Input input) =>
+// NOTE: Depending on the MCP C# SDK preview version you installed,
+// there may be helpers to map HTTP/SSE MCP endpoints (e.g., MapMcpHttp/MapMcpSse).
+// Use them if present in your package version. The REST façade below is
+// just for convenience testing from the browser.
+
+// ---- Convenience REST façade for quick fetch() from React ----
+// This calls the same logic as our MCP tool method.
+app.MapPost("/api/image-to-react", async (ImageToReactTool.Input input, IHttpClientFactory httpFactory) =>
 {
-    // For Step 4, we return a placeholder TSX.
-    var result = await ImageToReactTool.ImageToReact(input);
-    return Results.Json(new { tsx = result });
+    var tsx = await ImageToReactTool.ImageToReact(input, httpFactory);
+    return Results.Json(new { tsx });
 });
 
 app.Run();
 
 
 // ================== MCP TOOL TYPE ==================
-/// <summary>
-/// MCP tool for converting UI images to React TSX components.
-/// Currently returns placeholder components; will integrate OpenAI Vision in future iterations.
-/// </summary>
 [McpServerToolType]
 public static class ImageToReactTool
 {
-    /// <summary>
-    /// Input parameters for the image-to-react conversion tool.
-    /// Accepts a base64-encoded image and optional hints for the conversion.
-    /// </summary>
+    // Input the browser sends us (image as base64 data URL or raw base64 string)
     public class Input
     {
-        /// <summary>Base64-encoded image data (data URI format supported: data:image/...;base64,...)</summary>
         public required string ImageBase64 { get; set; }
-
-        /// <summary>Optional hints about the desired component style (e.g., "card with title + subtitle")</summary>
-        public string? Hints { get; set; }
+        public string? Hints { get; set; } // optional UI hints you may pass from the UI
     }
 
     /// <summary>
-    /// (Step 4 placeholder) Returns a trivial TSX component string.
-    /// In Step 5 we'll call OpenAI Vision and return real code.
+    /// Calls OpenAI (vision) with the provided image and returns a single, self-contained
+    /// React TSX component as a string. We use Chat Completions with a vision-capable model.
     /// </summary>
-    [McpServerTool, Description("Convert a UI image to a React TSX component (placeholder in Step 4).")]
-    public static ValueTask<string> ImageToReact(Input input)
+    [McpServerTool, Description("Convert a UI image to a React TSX component.")]
+    public static async ValueTask<string> ImageToReact(Input input, IHttpClientFactory httpFactory)
     {
-        // Just prove plumbing works; ignore image for now.
-        var tsx = """
-        import React from "react";
-
-        export default function GeneratedCard() {
-          return (
-            <div style={{
-              borderRadius: 12, padding: 16, border: "1px solid #1f2937",
-              background: "#0b1220", color: "#e5e7eb", maxWidth: 420
-            }}>
-              <h3 style={{ margin: "0 0 8px" }}>Hello from MCP</h3>
-              <p style={{ margin: 0, color: "#94a3b8" }}>
-                Step 4 placeholder component (image ignored).
-              </p>
-            </div>
-          );
+        // 1) Normalize the incoming image: ensure we have a data URL
+        // If user passed raw base64 like "AAAA...", build a data URL.
+        var dataUrl = input.ImageBase64.Trim();
+        if (!dataUrl.StartsWith("data:image"))
+        {
+            // assume PNG if not specified; adjust if you detect JPEG, etc.
+            dataUrl = $"data:image/png;base64,{dataUrl}";
         }
-        """;
-        return ValueTask.FromResult(tsx);
+
+        // 2) Build a very explicit system/user prompt so the model returns clean TSX.
+        var systemPrompt =
+@"You are an expert React + TypeScript UI generator.
+Given a UI screenshot or sketch, output a single, self-contained React component in TSX.
+Follow these rules STRICTLY:
+- Use a default export function component.
+- No external network calls, no external libraries (React only).
+- Inline styles or basic classNames only (no CSS frameworks).
+- Use straightforward semantic HTML structure based on the image.
+- Add brief JSDoc at the top documenting the component and its props (if any).
+- Return ONLY a Markdown fenced code block with language 'tsx' (no extra commentary).";
+
+        var userPrompt = $@"Generate a React TSX component that best matches the UI in the provided image.
+{(string.IsNullOrWhiteSpace(input.Hints) ? "" : $"Extra hints: {input.Hints}")}";
+
+        // 3) Call OpenAI Chat Completions with a vision-capable model (e.g., gpt-4o-mini).
+        var http = httpFactory.CreateClient("openai");
+
+        var payload = new
+        {
+            model = "gpt-4o-mini",
+            messages = new object[]
+            {
+                new {
+                    role = "system",
+                    content = new object[] {
+                        new { type = "text", text = systemPrompt }
+                    }
+                },
+                new {
+                    role = "user",
+                    content = new object[] {
+                        new { type = "text", text = userPrompt },
+                        new { type = "image_url", image_url = new { url = dataUrl } }
+                    }
+                }
+            },
+            temperature = 0.2,
+            // keep responses compact; we only need a single component
+            max_tokens = 1200
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        using var res = await http.SendAsync(req);
+        var body = await res.Content.ReadAsStringAsync();
+
+        if (!res.IsSuccessStatusCode)
+        {
+            // Return a friendly TSX error component so the UI can still render something.
+            var errorMsg = $"OpenAI API error {(int)res.StatusCode}: {body}";
+            return WrapAsErrorComponent(errorMsg);
+        }
+
+        // 4) Parse the result and extract the code block (```tsx ... ```).
+        using var doc = JsonDocument.Parse(body);
+        var content = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        if (string.IsNullOrWhiteSpace(content))
+            return WrapAsErrorComponent("Empty response from model.");
+
+        // Extract ```tsx ... ``` fenced block if present
+        var match = Regex.Match(content, "```tsx\\s*([\\s\\S]*?)```", RegexOptions.Multiline);
+        var tsx = match.Success ? match.Groups[1].Value.Trim() : content.Trim();
+
+        // Basic safety: ensure it exports a default component; if not, wrap it.
+        if (!tsx.Contains("export default"))
+        {
+            tsx = "export default function GeneratedComponent(){ return (<div>Component missing. Model output:</div>); }\n\n" + tsx;
+        }
+
+        return tsx;
     }
+
+    private static string WrapAsErrorComponent(string msg) =>
+$@"import React from ""react"";
+export default function GeneratedError() {{
+  return (
+    <div style={{padding:16, border:'1px solid #7f1d1d', background:'#431515', color:'#fecaca', borderRadius:12}}>
+      <h3 style={{margin:'0 0 8px'}}>Generation Error</h3>
+      <pre style={{whiteSpace:'pre-wrap'}}>{EscapeForJsx(msg)}</pre>
+    </div>
+  );
+}}
+";
+
+    // Minimal escape for JSX <pre>
+    private static string EscapeForJsx(string s) =>
+        s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 }

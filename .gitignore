@@ -18,6 +18,12 @@ dist/
 .env.*
 !.env.example
 
+# Test folders
+test/
+tests/
+**/test/
+**/tests/
+
 # ---- .NET / C# ----
 bin/
 obj/
