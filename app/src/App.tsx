@@ -41,7 +41,8 @@ export default function App() {
       const dataUrl = await toBase64DataUrl(imageFile);
 
       // 2) POST to the MCP server (server holds the OpenAI key)
-      const res = await fetch("http://localhost:5287/api/image-to-react", {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5287";
+      const res = await fetch(`${apiUrl}/api/image-to-react`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

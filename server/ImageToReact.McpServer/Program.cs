@@ -19,6 +19,10 @@ if (string.IsNullOrWhiteSpace(openAiApiKey))
     throw new InvalidOperationException("OPENAI_API_KEY is not set. Create server/.env and add OPENAI_API_KEY=...");
 }
 
+// Read server port from .env or default to 5287
+var serverPort = Environment.GetEnvironmentVariable("SERVER_PORT") ?? "5287";
+builder.WebHost.UseUrls($"http://localhost:{serverPort}");
+
 // Console logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
