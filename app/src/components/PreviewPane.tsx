@@ -1,13 +1,13 @@
+import DemoComponent from "../samples/DemoComponent";
+
 /**
- * Just a placeholder area for Step 2.
- * In Step 3/6, we'll render real components here (with sandboxing).
+ * Renders a static demo TSX component so you can verify the preview region works.
+ * Later, we'll replace this with dynamically evaluated AI-generated components.
  */
 export default function PreviewPane() {
   return (
     <div className="preview-pane">
-      <div className="preview-placeholder">
-        Preview will render here in later steps.
-      </div>
+      <DemoComponent />
     </div>
   );
 }
