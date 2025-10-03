@@ -1,28 +1,47 @@
-/* Keep styles minimal and readable. No frameworks yet. */
+/**
+ * Global Styles for Image-to-React Converter
+ *
+ * This stylesheet provides a minimal, dark-themed UI without external frameworks.
+ * Color scheme inspired by Tailwind's slate/gray/blue palettes.
+ */
+
+/* ==================== CSS VARIABLES ==================== */
+
 :root {
-  --bg: #0f172a; /* slate-950-ish */
-  --panel: #111827; /* gray-900-ish */
-  --text: #e5e7eb; /* gray-200-ish */
-  --muted: #94a3b8; /* slate-400-ish */
-  --border: #1f2937; /* gray-800-ish */
-  --accent: #2563eb; /* blue-600-ish */
+  /* Dark theme color palette */
+  --bg: #0f172a;         /* Main background (slate-950) */
+  --panel: #111827;      /* Panel/card background (gray-900) */
+  --text: #e5e7eb;       /* Primary text color (gray-200) */
+  --muted: #94a3b8;      /* Secondary/muted text (slate-400) */
+  --border: #1f2937;     /* Border color (gray-800) */
+  --accent: #2563eb;     /* Primary action color (blue-600) */
 }
+
+/* ==================== GLOBAL RESETS ==================== */
 
 * {
   box-sizing: border-box;
 }
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
 }
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, sans-serif;
 }
 
+/* ==================== LAYOUT ==================== */
+
+/**
+ * Main application shell
+ * Two-column grid: sidebar (320px) + main content (flexible)
+ */
 .app-shell {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -31,6 +50,9 @@ body {
   padding: 16px;
 }
 
+/**
+ * Column containers with panel styling
+ */
 .left-col,
 .right-col {
   background: var(--panel);
@@ -39,15 +61,27 @@ body {
   padding: 16px;
 }
 
+/**
+ * Heading styles within columns
+ */
 .left-col h2,
 .right-col h2 {
   margin: 0 0 8px;
 }
+
+/**
+ * Muted text for secondary information
+ */
 .muted {
   color: var(--muted);
   margin: 6px 0 12px;
 }
 
+/* ==================== BUTTONS ==================== */
+
+/**
+ * Primary action button (used for main "Generate" action)
+ */
 .upload .upload-btn {
   display: inline-block;
   background: var(--accent);
@@ -58,7 +92,9 @@ body {
   text-align: center;
 }
 
-/* Secondary button style */
+/**
+ * Secondary button style (used for auxiliary actions like Copy, Download, Refine)
+ */
 .secondary-btn {
   display: inline-block;
   background: #374151;
@@ -70,26 +106,42 @@ body {
   text-align: center;
 }
 
+/* ==================== RIGHT COLUMN (CODE AREA) ==================== */
+
+/**
+ * Right column layout - single pane for code editor
+ */
 .right-col {
   display: grid;
   grid-template-rows: 1fr;
   gap: 16px;
 }
 
-/* New helper when there is just one pane on the right */
+/**
+ * Helper class for single-pane layout
+ */
 .right-col.one-pane {
   grid-template-rows: 1fr;
 }
 
+/**
+ * Individual pane container (code editor section)
+ */
 .pane {
   border: 1px dashed var(--border);
   border-radius: 12px;
   padding: 12px;
-  min-height: 0; /* allow children to flex correctly */
+  min-height: 0; /* Allows flex children to shrink properly */
   display: flex;
   flex-direction: column;
 }
 
+/* ==================== CODE & PREVIEW (LEGACY) ==================== */
+
+/**
+ * Legacy code pane styles (kept for backwards compatibility)
+ * Note: Monaco editor is now used instead of textarea
+ */
 .code-pane {
   flex: 1;
   width: 100%;
@@ -104,6 +156,9 @@ body {
   line-height: 1.4;
 }
 
+/**
+ * Preview pane container (currently not in use)
+ */
 .preview-pane {
   flex: 1;
   border-radius: 8px;
@@ -113,6 +168,9 @@ body {
   place-items: center;
 }
 
+/**
+ * Placeholder text for preview pane
+ */
 .preview-placeholder {
   color: var(--muted);
   font-size: 0.95rem;
