@@ -33,10 +33,11 @@ builder.Services
     .WithToolsFromAssembly(); // finds [McpServerToolType] types with [McpServerTool] methods
 
 // Allow calls from your Vite dev server
+var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "http://localhost:5173";
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(frontendUrl)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());

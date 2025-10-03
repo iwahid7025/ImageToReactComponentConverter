@@ -6,6 +6,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Documentation folder
+docs/
+
 # ---- Node / Frontend ----
 node_modules/
 dist/
