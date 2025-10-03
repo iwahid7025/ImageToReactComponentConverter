@@ -1,0 +1,44 @@
+# ---- General ----
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+
+# ---- Node / Frontend ----
+node_modules/
+dist/
+.build/
+.cache/
+.vite/
+
+# Env files (never commit real secrets)
+.env
+.env.*
+!.env.example
+
+# ---- .NET / C# ----
+bin/
+obj/
+*.user
+*.suo
+*.vcxproj.user
+*.pubxml
+*.PublishSettings
+*.nupkg
+project.lock.json
+
+# ---- IDEs ----
+.vscode/
+.idea/
+*.iml
+
+# ---- Coverage / Test artifacts ----
+coverage/
+TestResult*/
+*.trx
+
+# ---- OS ----
+ehthumbs.db
+Icon?
